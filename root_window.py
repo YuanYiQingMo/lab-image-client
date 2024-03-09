@@ -116,21 +116,21 @@ def output():
         p1 = tree1.item(tree1.selection()[0],"values")[0]
     except IndexError:
         lab_b.configure(text='请先于一级菜单处选择文件, 再进行相关操作')
-        return 0
+        return
     except:
         lab_b.configure(text='错误！(ch p1)')
-        return 0
+        return
     try:
         p2 = int(tree2.item(tree2.selection()[0],"values")[0])
     except IndexError:
         p2 = -1
     except:
         lab_b.configure(text='错误！(ch p2)')
-        return 0
+        return
 
     if os.access(allfiles_path[p1][p2][7], os.F_OK):
         lab_b.configure(text='请勿重复处理！')
-        return 0
+        return
     else:
         op_file(p1, p2)
     lab_b.configure(text='当前文件已处理完毕！')
@@ -140,7 +140,7 @@ def outputs():
         p2 = 0
         for qi in allfiles_path[p1]:
             if os.access(allfiles_path[p1][p2][7], os.F_OK):
-                break
+                continue
             else:
                 op_file(p1, p2)
             p2 += 1
@@ -237,6 +237,22 @@ def show2(e):
 
 def pop2(event):
     menu_t2.post(event.x_root,  event.y_root)
+
+def pop3(event):
+    menu_t3.post(event.x_root,  event.y_root)
+
+# TODO删除点
+def delete_point_by_index():
+    select_point = table.selection()
+    table.delete(select_point)
+    # 重新绘制图片
+    re_fig = plt.figure()
+    re_ax = re_fig.subplots(1, 1)
+    image = io.imread(tree1.item(tree1.selection()[0],"values")[0])
+    re_ax.imshow(image, cmap='gray', interpolation='nearest')
+
+    
+
 
 # 选择文件
 allfiles_path = defaultdict(list) # 文件库defaultdict(list)
@@ -523,6 +539,10 @@ for col in table['columns']:
 table.column("#1", anchor=tk.CENTER, width=100)
 table.column("#2", anchor=tk.CENTER, width=200)
 table.pack(fill=tk.BOTH, expand=True)
+
+table.bind('<ButtonRelease-3>', pop3)
+menu_t3 = tk.Menu(frame1, tearoff=False)
+menu_t3.add_command(label="删除", command=delete_point_by_index)
 
 info = [[0,'-']]
 for itm in info:
