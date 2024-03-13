@@ -290,8 +290,13 @@ def delete_point_by_click():
     delete_windows_menu = tk.Menu(delete_windows, tearoff=False)
     delete_windows_menu.add_command(label="删除",command=delete_point)
     
+    delete_windows.protocol('WM_DELETE_WINDOW', close_edit_win)
+
+
     click_point = list()
 
+    def close_edit_win():
+        menu_t4.entryconfig(0,state='normal')
     def delete_point():
         x, y = click_point
         print(x,y)
