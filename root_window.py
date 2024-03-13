@@ -4,10 +4,12 @@ from tkinter import messagebox
 from tkinter import filedialog
 import filetype
 import os
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageEnhance, ImageOps
 from collections import defaultdict
 import csv
 import shutil
+
+
 
 from skimage import io, feature
 import math
@@ -21,6 +23,9 @@ import seaborn as sns
 '''
 output_folder = "output_folder"
 os.makedirs(output_folder, exist_ok=True)
+
+enhance_folder = "enhance_folder"
+os.makedirs(enhance_folder, exist_ok=True)
 
 def op_file(op_file1, op_file2): # 处理单个图像
     image = io.imread(op_file1)
@@ -93,7 +98,7 @@ def op_file(op_file1, op_file2): # 处理单个图像
     ax2 = fig2.subplots(1, 1)
     ax2.hist(data_op2, density=True, color='lightgreen', ec='black')
     ax2.annotate(f'd = {calculate_mean_diameter(data_op2):.2f} ± {calculate_spread_parameter(data_op2):.2f}', (0.7, 0.8), xycoords='figure fraction', annotation_clip=False)
-    sns.kdeplot(data_op2, shade=False)
+    sns.kdeplot(data_op2, fill=False)
     fig2.savefig(allfiles_path[op_file1][op_file2][9], dpi=480)
     plt.close(fig2)
 
@@ -161,6 +166,7 @@ def delete_op():
 # 菜单1
 # p1 = tree1.item(tree1.selection()[0],"values")[0]
 def show1(e): # 点击菜单1上节点
+    menu_t4.entryconfig(0,state='disabled')
     try:
         p1 = tree1.item(tree1.selection()[0],"values")[0]
     except IndexError:
@@ -185,10 +191,20 @@ def show1(e): # 点击菜单1上节点
         i += 1
     show_photo(p1)
     lab_b.configure(text='原图!')
+    menu_t4.entryconfig(0,state='disabled')
 
 
 def pop1(event):
     menu_t1.post(event.x_root,  event.y_root)
+
+def pop2(event):
+    menu_t2.post(event.x_root,  event.y_root)
+
+def pop3(event):
+    menu_t3.post(event.x_root,  event.y_root)
+
+def pop4(event):
+    menu_t4.post(event.x_root,  event.y_root)
 
 def dele1():
     p1 = tree1.item(tree1.selection()[0],"values")[0]
@@ -215,10 +231,12 @@ def show2(e):
             show_photo(allfiles_path[p1][p2][7])
             lab_b.configure(text='结果图！')
             show_photo_cs -= 1
+            menu_t4.entryconfig(0,state='normal')
         else:
             show_photo(allfiles_path[p1][p2][9])
             lab_b.configure(text='粒径分布图！')
-            show_photo_cs += 1         
+            show_photo_cs += 1
+            menu_t4.entryconfig(0,state='disabled')
 
         for child in table.get_children():
             table.delete(child)
@@ -234,24 +252,94 @@ def show2(e):
     else:
         show_photo(p1)
         lab_b.configure(text='尚未处理, 显示原图')
-
-def pop2(event):
-    menu_t2.post(event.x_root,  event.y_root)
-
-def pop3(event):
-    menu_t3.post(event.x_root,  event.y_root)
+        menu_t4.entryconfig(0,state='disabled')
 
 # TODO删除点
 def delete_point_by_index():
-    select_point = table.selection()
-    table.delete(select_point)
-    # 重新绘制图片
-    re_fig = plt.figure()
-    re_ax = re_fig.subplots(1, 1)
-    image = io.imread(tree1.item(tree1.selection()[0],"values")[0])
-    re_ax.imshow(image, cmap='gray', interpolation='nearest')
+    # 这里使用
+    print("删除点")
 
+delete_img_file = list()
+def delete_point_by_click():
+    #打开删除窗口
+    menu_t4.entryconfig(0,state='disabled')
+    lab_b.configure(text='请先关闭选择窗口')
+
+    delete_windows = tk.Toplevel()
+    delete_windows.title("右键粒径删除")
+
+    p1 = tree1.item(tree1.selection()[0],"values")[0]
+    p2 = int(tree2.item(tree2.selection()[0],"values")[0])
+
+    img_path = allfiles_path[p1][p2][7]
+
+    delete_windows.geometry(f"{int(screen_width*0.9)}x{int(screen_height*0.9)}+{int(screen_width*0.025)}+{int(screen_height*0.025)}")
+
+    delete_img_lb = tk.Label(delete_windows)
+    delete_img_lb.pack(fill='both')
+
+    w, h = Image.open(os.path.abspath(img_path)).size
+    factor = min([1.0*int(delete_windows.winfo_screenwidth())/w, 1.0*int(delete_windows.winfo_screenheight())/h])
+    width = int(w*factor)
+    height = int(h*factor)
+    resize_img = ImageTk.PhotoImage(Image.open(os.path.abspath(img_path)).resize((width, height)))
+    delete_img_file.append(resize_img)
+    delete_img_lb.configure(image=delete_img_file[-1])
+
+    delete_windows.bind('<ButtonRelease-3>',pop_delete)
+    delete_windows_menu = tk.Menu(delete_windows, tearoff=False)
+    delete_windows_menu.add_command(label="删除",command=delete_point)
     
+    click_point = list()
+
+    def delete_point():
+        x, y = click_point
+        print(x,y)
+    def pop_delete(event):
+        delete_windows_menu.post(event.x_root,  event.y_root)
+        click_point.append((event.x_root,  event.y_root))
+        print(click_point)
+
+# 衬度翻转
+def contrastFlipping():
+    image_path = tree1.item(tree1.selection()[0],"values")[0]
+    image = Image.open(image_path)
+    imgF = Image.fromarray(np.array(image))
+    res = ImageOps.invert(imgF)
+    save_name = f'{os.path.basename(os.path.splitext(image_path)[0]) }_preFlip.tif'
+    res.save(os.path.abspath(os.path.join(os.path.abspath(enhance_folder), save_name)))
+    addFile(os.path.join(os.path.abspath(enhance_folder), save_name).replace("\\","/"))
+
+
+# 对比度增强
+def contrastEnhancement():
+    image_path = tree1.item(tree1.selection()[0],"values")[0]
+    contrast = 1.5
+    image = Image.open(image_path)
+    imgR = Image.fromarray(np.array(image))
+    enh_con = ImageEnhance.Contrast(imgR)
+    image_contrasted = enh_con.enhance(contrast)
+    save_name = f'{os.path.basename(os.path.splitext(image_path)[0]) }_preCon.tif'
+    image_contrasted.save(os.path.abspath(os.path.join(os.path.abspath(enhance_folder), save_name)))
+    addFile(os.path.join(os.path.abspath(enhance_folder), save_name).replace("\\","/"))
+    return image_contrasted
+
+# 将处理好的图像加入tree1
+def addFile(file_path):
+    f_path = set()
+    f_path.add(file_path)
+    for x in f_path.difference(allfiles_path.keys()):
+        # 0:name  1,2,3,4,5,6:参数  7:png路径  8:csv路径 9:histogram路径
+        allfiles_path[x] = [[os.path.basename(os.path.splitext(x)[0]),
+                             float(20), float(218), int(55), int(5), int(20), float(0.1), 
+                             os.path.abspath(os.path.join(
+                                 output_folder, f'processed_{os.path.basename(os.path.splitext(x)[0])}.png')), 
+                             os.path.abspath(os.path.join(
+                                 output_folder, f'diameters_{os.path.basename(os.path.splitext(x)[0])}.csv')), 
+                             os.path.abspath(os.path.join(
+                                 output_folder, f'histogram_{os.path.basename(os.path.splitext(x)[0])}.png'))]]
+        tree1.insert('', 0, text=allfiles_path[x][0][0], values=(x))
+
 
 
 # 选择文件
@@ -418,6 +506,9 @@ menu_gj = tk.Menu(menu, tearoff=False)
 menu_gj.add_command(label='处理 当前文件', command=output)
 menu_gj.add_command(label='批量处理 列表所有文件', command=outputs)
 menu_gj.add_separator()
+menu_gj.add_command(label='对比度增强 当前文件', command=contrastEnhancement)
+menu_gj.add_command(label='衬度翻转 当前文件',command=contrastFlipping)
+menu_gj.add_separator()
 menu_gj.add_command(label='导出当前文件结果', command=copy_op)
 
 menu_bz = tk.Menu(menu, tearoff=False)
@@ -464,8 +555,10 @@ pane5.add(pane7)
 '''
 frame1 = tk.Frame(pane2)
 frame2 = tk.Frame(pane3)
+frame3 = tk.Frame(pane4)
 frame1.pack(fill=tk.BOTH, expand=True)
 frame2.pack(fill=tk.BOTH, expand=True)
+frame3.pack(fill=tk.BOTH, expand=True)
 
 #菜单1
 tree1 = ttk.Treeview(frame1)
@@ -553,6 +646,12 @@ for itm in info:
 '''
 img_lb = tk.Label(pane4)
 img_lb.pack()
+
+img_lb.bind('<ButtonRelease-3>', pop4)
+menu_t4 = tk.Menu(img_lb, tearoff=False)
+edit_state = 'disable' #恢复 normal
+menu_t4.add_command(label="编辑(删除指定粒径)", command=delete_point_by_click,state=edit_state)
+
 
 root.protocol('WM_DELETE_WINDOW', delete_op)
 
