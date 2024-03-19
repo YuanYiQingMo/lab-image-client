@@ -380,7 +380,6 @@ def rectangle_end(event):
             clear_rectangle()
         rect_start = None
 
-
 delete_windows_img = list()
 # coordinate_groups =[]
 def delete_row_from_img():
@@ -786,7 +785,6 @@ table.pack(fill=tk.BOTH, expand=True)
 info = [[0,'-']]
 for itm in info:
     table.insert("",tk.END,values=itm)
-
 
 '''
 窗口右侧___________________________________________________________________________________________________________________________
