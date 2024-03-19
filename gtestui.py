@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, Toplevel ,ttk , Canvas ,simpledialog
 from PIL import Image, ImageTk ,ImageOps, ImageEnhance
 from skimage import io, feature
+from placeholder import PlaceholderEntry
 import os
 import csv
 import math
@@ -385,8 +386,8 @@ delete_windows_img = list()
 def delete_row_from_img():
 
     # test
-    selected_file_in2 = 'E:/works/lab/lab-image-client/output_folder/example.png'
-    selected_file_in2_csv = 'E:/works/lab/lab-image-client/mid_folder/example.csv'
+    # selected_file_in2 = 'E:/works/lab/lab-image-client/output_folder/example.png'
+    # selected_file_in2_csv = 'E:/works/lab/lab-image-client/mid_folder/example.csv'
 
     click_point = list()
     add_point_start= list()
@@ -517,9 +518,9 @@ def delete_row_from_img():
             x = (x1 + x2)/2
             y = (y1 + y2)/2
             r = abs(item[0][0]-item[1][0]) / factor / 2
-            diameter = float(rows[1][1])/float(rows[1][4])*r
-            print(blob_num,diameter,y,x,r)
-            print("--------------------")
+            diameter = format(float(rows[1][1])/float(rows[1][4])*r,'.4f')
+            # print(blob_num,diameter,y,x,r)
+            # print("--------------------")
             rows.append([str(blob_num),str(diameter),str(y),str(x),str(r)])
             # print(rows[10])
         
@@ -716,7 +717,7 @@ param1 = tk.LabelFrame(parameter_input, text=f'真实长度(nm)')
 param2 = tk.LabelFrame(parameter_input, text=f'图中像素长度')
 param3 = tk.LabelFrame(parameter_input, text=f'最大粒子直径(像素):')
 param4 = tk.LabelFrame(parameter_input, text=f'最小粒子直径(像素):')
-param5 = tk.LabelFrame(parameter_input, text=f'数量参数():')
+param5 = tk.LabelFrame(parameter_input, text=f'数量参数(个):')
 param6 = tk.LabelFrame(parameter_input, text=f'阈值(0.01~0.1):')
 
 param1.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -737,26 +738,52 @@ def measure_and_set_blank2():
     img_area.bind('<ButtonRelease-1>', release_event)  # 鼠标释放
     messagebox.showinfo("提示", "请按住鼠标左键从第一个点拖动到第二个点，然后释放。")
 
+def measure_and_set_blank3():
+    clear_points()  # 清除现有的点
+    img_area.bind('<Button-1>', click_event)  # 鼠标按下
+    img_area.bind('<B1-Motion>', move_event)  # 鼠标移动
+    img_area.bind('<ButtonRelease-1>', release_event3)  # 鼠标释放
+    messagebox.showinfo("提示", "请按住鼠标左键从第一个点拖动到第二个点，然后释放。")
+    
+def measure_and_set_blank4():
+    clear_points()  # 清除现有的点
+    img_area.bind('<Button-1>', click_event)  # 鼠标按下
+    img_area.bind('<B1-Motion>', move_event)  # 鼠标移动
+    img_area.bind('<ButtonRelease-1>', release_event4)  # 鼠标释放
+    messagebox.showinfo("提示", "请按住鼠标左键从第一个点拖动到第二个点，然后释放。")
 
-blank1 = tk.Entry(param1)
+
+blank1 = PlaceholderEntry(param1,'请输入比例尺的长度')
 blank1.pack(fill=tk.X, padx=5, pady=2)
 measure_button = tk.Button(param2, text='点击测量', command=measure_and_set_blank2)
 measure_button.pack(side=tk.LEFT, padx=5)
-blank2 = tk.Entry(param2)
+blank2 =PlaceholderEntry(param2,"输入或点击测量比例尺所占像素")
 blank2.pack(fill=tk.X, padx=5, pady=2)
-blank3 = tk.Entry(param3)
+measure_button3 = tk.Button(param3, text='点击测量', command=measure_and_set_blank3)
+measure_button3.pack(side=tk.LEFT, padx=5)
+blank3 = PlaceholderEntry(param3,"测量或输入所需最大粒子直径")
 blank3.pack(fill=tk.X, padx=5, pady=2)
-blank4 = tk.Entry(param4)
+measure_button4 = tk.Button(param4, text='点击测量', command=measure_and_set_blank4)
+measure_button4.pack(side=tk.LEFT, padx=5)
+blank4 = PlaceholderEntry(param4,'测量或输入所需最小粒子直径')
 blank4.pack(fill=tk.X, padx=5, pady=2)
-blank5 = tk.Entry(param5)
+blank5 = PlaceholderEntry(param5)
 blank5.pack(fill=tk.X, padx=5, pady=2)
-blank6 = tk.Entry(param6)
+blank6 = PlaceholderEntry(param6)
 blank6.pack(fill=tk.X, padx=5, pady=2)
 
 save_param = tk.Frame(parameter_input)
-save_param.pack(side=tk.TOP, pady=2)
-tk.Button(save_param, text='保存参数', command=lambda: get_scale_params()).pack(side=tk.LEFT, padx=5)
+save_param2 = tk.Frame(parameter_input)
 
+save_param.pack(side=tk.TOP, pady=10)
+save_param2.pack(side=tk.TOP, pady=10)
+tk.Button(save_param, text='保存参数', command=lambda: get_scale_params()).pack(side=tk.LEFT, padx=10)
+
+tk.Button(save_param, text='处理图像', command=lambda: handle_current_image()).pack(side=tk.RIGHT, padx=10)
+
+tk.Button(save_param2, text='颜色翻转', command=lambda: flip_colors()).pack(side=tk.LEFT, padx=10)
+
+tk.Button(save_param2, text='选择区域', command=lambda: start_area_selection()).pack(side=tk.RIGHT, padx=10)
 '''
 窗口中间___________________________________________________________________________________________________________________________
 '''
@@ -813,6 +840,7 @@ def move_event(event):
 
 def stop_measuring():
     img_area.unbind('<Button-1>')
+    img_area.unbind('<B1-Motion>')
     img_area.unbind('<ButtonRelease-1>')
 
 def draw_line(x1, y1, x2, y2):
@@ -839,6 +867,44 @@ def release_event(event):
             if messagebox.askyesno("确认", f"两点之间的像素距离是: {distance:.2f}。保存此测量结果吗？"):
                 blank2.delete(0, tk.END)
                 blank2.insert(0, distance)
+                clear_line()
+                stop_measuring()
+            else:
+                clear_line()
+            clear_points()
+
+def release_event3(event):
+    global points, drawing, distance
+    if drawing:
+        points.append((event.x, event.y))
+        drawing = False
+        if len(points) == 2:
+            x1, y1 = points[0]
+            x2, y2 = points[1]
+            distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) /factor
+            draw_line(x1, y1, x2, y2)
+            if messagebox.askyesno("确认", f"两点之间的像素距离是: {distance:.2f}。保存此测量结果吗？"):
+                blank3.delete(0, tk.END)
+                blank3.insert(0, distance)
+                clear_line()
+                stop_measuring()
+            else:
+                clear_line()
+            clear_points()
+
+def release_event4(event):
+    global points, drawing, distance
+    if drawing:
+        points.append((event.x, event.y))
+        drawing = False
+        if len(points) == 2:
+            x1, y1 = points[0]
+            x2, y2 = points[1]
+            distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) /factor
+            draw_line(x1, y1, x2, y2)
+            if messagebox.askyesno("确认", f"两点之间的像素距离是: {distance:.2f}。保存此测量结果吗？"):
+                blank4.delete(0, tk.END)
+                blank4.insert(0, distance)
                 clear_line()
                 stop_measuring()
             else:
