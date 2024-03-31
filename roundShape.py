@@ -1,6 +1,6 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, Toplevel ,ttk , Canvas ,simpledialog
-from PIL import Image, ImageTk ,ImageOps, ImageEnhance
+from tkinter import filedialog, messagebox ,ttk
+from PIL import Image, ImageTk ,ImageOps
 from skimage import io, feature
 from placeholder import PlaceholderEntry
 import os
@@ -29,9 +29,25 @@ os.makedirs(output_folder, exist_ok=True)
 mid_folder = "mid_folder"
 os.makedirs(mid_folder, exist_ok=True)
 
+def remove_edge_particles(blobs, img_height, img_width):
+    filtered_blobs = []
+    for blob in blobs:
+        if selected_region :
+            x1, y1, x2, y2 = map(int, selected_region)
+            if x1 < x2 :
+                y_d, x_d, r_d = blob[0] + y1, blob[1] + x1, blob[2]
+            else:
+                y_d, x_d, r_d = blob[0] + y2, blob[1] + x2, blob[2]
+        else:
+            y_d, x_d, r_d = blob[0], blob[1], blob[2]
+        # 检查粒子是否远离图像边缘
+        if (x_d - r_d > 0) and (y_d - r_d > 0) and (x_d + r_d < img_width) and (y_d + r_d < img_height):
+            filtered_blobs.append(blob)
+    return np.array(filtered_blobs)
 processed_files = []
 processed_files_csv = []
 mid_files_csv = []
+
 def process_image(saved_params, selected_file_in1, selected_region = None):
     global processed_files, processed_files_csv, mid_files_csv 
     base_filename = os.path.splitext(os.path.basename(selected_file_in1))[0]
@@ -50,13 +66,17 @@ def process_image(saved_params, selected_file_in1, selected_region = None):
         x1, y1, x2, y2 = map(int, selected_region)
         user_image = image[y1:y2, x1:x2]
     else:
-        user_image = image  
+        user_image = image
     blobs_log = feature.blob_log(user_image, max_sigma=max_sigma, min_sigma=min_sigma, num_sigma=num_sigma, threshold=threshold)
     blobs_log[:, 2] = blobs_log[:, 2] * math.sqrt(2)
+    height_user_image, width_user_image = user_image.shape[:2]
+
+    filtered_log = remove_edge_particles(blobs_log, height_user_image, width_user_image)
+
     with open(os.path.join(output_folder, f'{base_filename}.csv'), 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Blob Number', 'Diameter (nm)'])
-        for j, blob in enumerate(blobs_log):  
+        for j, blob in enumerate(filtered_log):  
             diameter_pixels = 2 * blob[2]
             diameter_mm = diameter_pixels / pixels_per_mm
             diameter_nm = diameter_mm   
@@ -64,7 +84,7 @@ def process_image(saved_params, selected_file_in1, selected_region = None):
     with open(os.path.join(mid_folder, f'{base_filename}.csv'), 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Blob Number', 'Diameter (nm)' , 'y' , 'x' , 'r'])
-        for j, blob in enumerate(blobs_log):  
+        for j, blob in enumerate(filtered_log):  
             diameter_pixels = 2 * blob[2]
             diameter_mm = diameter_pixels / pixels_per_mm
             diameter_nm = diameter_mm   
@@ -99,7 +119,7 @@ def process_image(saved_params, selected_file_in1, selected_region = None):
 
     ax.set_xlim(0, image_width)
     ax.set_ylim(image_height, 0)
-    for j, blob in enumerate(blobs_log):
+    for j, blob in enumerate(filtered_log):
         if selected_region :
             if x1 < x2 :
                 y, x, r = blob[0] + y1, blob[1] + x1, blob[2]
@@ -125,34 +145,23 @@ def process_image(saved_params, selected_file_in1, selected_region = None):
         processed_image_area.insert('', 'end', text=basename)
     bottom_tips.configure(text='处理完成！') 
 
-def flip_colors():
-    global selected_file_in1 , imported_files
+
+def flip_and_adjust_contrast():
+    global selected_file_in1, imported_files
     if selected_file_in1:
         image = io.imread(selected_file_in1)
         image_pil = Image.fromarray(image)
         flipped_image_pil = ImageOps.invert(image_pil)
-        base_filename = os.path.basename(selected_file_in1)
-        flipped_image_path = os.path.join(mid_folder, f'{os.path.splitext(base_filename)[0]}_翻转{os.path.splitext(base_filename)[1]}')
-        flipped_image_pil.save(flipped_image_path)
-        imported_files.append(flipped_image_path)
-        original_image_area.insert('', 'end', text=f'{os.path.splitext(base_filename)[0]}_翻转{os.path.splitext(base_filename)[1]}')
-        bottom_tips.configure(text='颜色翻转完成！')
-    else:
-        bottom_tips.configure(text='请先选择图像')
-
-def adjust_contrast():
-    global selected_file_in1 , imported_files
-    if selected_file_in1:
-        image = Image.open(selected_file_in1)
-        image_np = np.array(image)
-        contrast_image_np = cv2.equalizeHist(image_np)
+        flipped_image_np = np.array(flipped_image_pil)
+        contrast_image_np = cv2.equalizeHist(flipped_image_np)
         contrast_image = Image.fromarray(contrast_image_np)
+        # Save the modified image
         base_filename = os.path.basename(selected_file_in1)
-        contrast_image_path = os.path.join(mid_folder, f'{os.path.splitext(base_filename)[0]}_对比度{os.path.splitext(base_filename)[1]}')
-        contrast_image.save(contrast_image_path)
-        imported_files.append(contrast_image_path)
-        original_image_area.insert('', 'end', text=f'{os.path.splitext(base_filename)[0]}_对比度{os.path.splitext(base_filename)[1]}')
-        bottom_tips.configure(text='对比度调整完成！')
+        modified_image_path = os.path.join(mid_folder, f'{os.path.splitext(base_filename)[0]}_翻转{os.path.splitext(base_filename)[1]}')
+        contrast_image.save(modified_image_path)
+        imported_files.append(modified_image_path)
+        original_image_area.insert('', 'end', text=f'{os.path.splitext(base_filename)[0]}_翻转{os.path.splitext(base_filename)[1]}')
+        bottom_tips.configure(text='颜色翻转和对比度调整完成！')
     else:
         bottom_tips.configure(text='请先选择图像')
 
@@ -162,8 +171,8 @@ def get_scale_params():
     try:
         scale_length_mm = float(blank1.get())  
         scale_length_pixels = float(blank2.get())  
-        max_sigma = float(blank3.get()) / 2
-        min_sigma = float(blank4.get()) / 2
+        max_sigma = float(blank3.get()) / 2 /scale_length_mm * scale_length_pixels
+        min_sigma = float(blank4.get()) / 2 /scale_length_mm * scale_length_pixels
         num_sigma = int(blank5.get())
         threshold = float(blank6.get())
         if max_sigma <= 0 or min_sigma <= 0 or num_sigma <= 0 or threshold < 0 or scale_length_mm <= 0 or scale_length_pixels <= 0:
@@ -198,15 +207,13 @@ def select_file():
         imported_files.append(selected_file)
         
 def select_output_folder():
-    global output_folder
     chosen_folder = filedialog.askdirectory(title='选择输出文件夹', initialdir='/')  
     if chosen_folder:
         for file_name in os.listdir(output_folder):
             source = os.path.join(output_folder, file_name)  
             destination = os.path.join(chosen_folder, file_name)  
             shutil.copy(source, destination) 
-        output_folder = chosen_folder  
-        messagebox.showinfo("保存成功", "已保存到: " + output_folder)  
+        messagebox.showinfo("保存成功", "已保存到: " + chosen_folder)  
     else:
         bottom_tips.configure(text="输出文件夹: 未选择")  
 
@@ -227,8 +234,8 @@ def show_image_2(event):
         if '_chart' not in item_text:
             selected_file_in2 = next(file for file in processed_files if item_text in file)
             show_photo(selected_file_in2)
-            
-            csv_file_name = f'{item_text.split(".")[0]}.csv'
+            filename, extension = os.path.splitext(item_text)
+            csv_file_name = f'{filename}.csv'
             selected_file_in2_csv = next(file for file in mid_files_csv if csv_file_name in file)
             selected_file_delete_csv = next(file for file in processed_files_csv if csv_file_name in file)
             bottom_tips.configure(text='已处理图像!')
@@ -263,12 +270,26 @@ def size_distribution_chart():
     item = processed_image_area.selection()
     if item:
         item_text = processed_image_area.item(item, "text")
-        output_filename = f'{item_text.split(".")[0]}_chart.png'
+        filename, extension = os.path.splitext(item_text)
+        output_filename = f'{filename}_chart.png'
         output_path = os.path.join(output_folder, output_filename)
         fig2.savefig(output_path, dpi=480)
         plt.close(fig2)
         processed_files.append(output_path)
         processed_image_area.insert('', 'end', text= output_filename)
+
+def recode_csv():
+    selected_file_in2_csv = 'E:\works\lab\lab-image-client\mid_folder\example.csv'
+    with open(selected_file_in2_csv,'r', newline='') as file:
+        csv_reader = csv.reader(file)
+        rows = list(csv_reader)
+        for i, row in enumerate(rows):
+            if i == 0:
+                continue
+            rows[i][0] = i
+    with open(selected_file_in2_csv,'w', newline='') as file:
+        csv_writer = csv.writer(file)
+        csv_writer.writerows(rows)
 
 def calculate_mean_diameter(data):
     total = float()
@@ -286,6 +307,8 @@ def calculate_spread_parameter(data):
 
 
 def handle_current_image():
+    if not messagebox.askyesnocancel(title='提醒!', message="请在处理图像前确认斑点为亮\n否则请先进行颜色翻转处理"):
+        return
     global selected_region
     if selected_file_in1 and saved_params:
         bottom_tips.configure(text='处理图片中') 
@@ -384,10 +407,6 @@ def rectangle_end(event):
 delete_windows_img = list()
 # coordinate_groups =[]
 def delete_row_from_img():
-
-    # test
-    # selected_file_in2 = 'E:/works/lab/lab-image-client/output_folder/example.png'
-    # selected_file_in2_csv = 'E:/works/lab/lab-image-client/mid_folder/example.csv'
 
     click_point = list()
     add_point_start= list()
@@ -622,10 +641,11 @@ menu_file.add_command(label='选择输出文件夹', command=select_output_folde
 menu_tool = tk.Menu(menu, tearoff=False)
 menu_tool.add_command(label='处理图像', command=handle_current_image)
 menu_tool.add_command(label='生成粒径分布图', command=size_distribution_chart)
+menu_tool.add_command(label='粒子重编号', command=recode_csv)
 menu_tool.add_separator()
 menu_tool.add_command(label='选择区域', command=start_area_selection)
-menu_tool.add_command(label='颜色翻转', command=flip_colors)
-menu_tool.add_command(label='调节对比度', command=adjust_contrast)
+menu_tool.add_command(label='颜色翻转', command=flip_and_adjust_contrast)
+
 
 menu_help = tk.Menu(menu, tearoff=False)
 menu_help.add_command(label='功能说明', command=tools_description)
@@ -715,9 +735,9 @@ lab = tk.Label(parameter_input, text='比例尺信息')
 lab.pack(side=tk.TOP, fill=tk.X)
 param1 = tk.LabelFrame(parameter_input, text=f'真实长度(nm)')
 param2 = tk.LabelFrame(parameter_input, text=f'图中像素长度')
-param3 = tk.LabelFrame(parameter_input, text=f'最大粒子直径(像素):')
-param4 = tk.LabelFrame(parameter_input, text=f'最小粒子直径(像素):')
-param5 = tk.LabelFrame(parameter_input, text=f'数量参数(个):')
+param3 = tk.LabelFrame(parameter_input, text=f'最大粒子直径(nm):')
+param4 = tk.LabelFrame(parameter_input, text=f'最小粒子直径(nm):')
+param5 = tk.LabelFrame(parameter_input, text=f'粒子不同尺寸的数量(10~30):')
 param6 = tk.LabelFrame(parameter_input, text=f'阈值(0.01~0.1):')
 
 param1.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -755,21 +775,26 @@ def measure_and_set_blank4():
 
 blank1 = PlaceholderEntry(param1,'请输入比例尺的长度')
 blank1.pack(fill=tk.X, padx=5, pady=2)
+
 measure_button = tk.Button(param2, text='点击测量', command=measure_and_set_blank2)
 measure_button.pack(side=tk.LEFT, padx=5)
 blank2 =PlaceholderEntry(param2,"输入或点击测量比例尺所占像素")
 blank2.pack(fill=tk.X, padx=5, pady=2)
+
 measure_button3 = tk.Button(param3, text='点击测量', command=measure_and_set_blank3)
 measure_button3.pack(side=tk.LEFT, padx=5)
 blank3 = PlaceholderEntry(param3,"测量或输入所需最大粒子直径")
 blank3.pack(fill=tk.X, padx=5, pady=2)
+
 measure_button4 = tk.Button(param4, text='点击测量', command=measure_and_set_blank4)
 measure_button4.pack(side=tk.LEFT, padx=5)
 blank4 = PlaceholderEntry(param4,'测量或输入所需最小粒子直径')
 blank4.pack(fill=tk.X, padx=5, pady=2)
-blank5 = PlaceholderEntry(param5)
+
+blank5 = PlaceholderEntry(param5,'粒径多种多样，则增大此值')
 blank5.pack(fill=tk.X, padx=5, pady=2)
-blank6 = PlaceholderEntry(param6)
+
+blank6 = PlaceholderEntry(param6,'粒子明显则使用较低阈值')
 blank6.pack(fill=tk.X, padx=5, pady=2)
 
 save_param = tk.Frame(parameter_input)
@@ -781,7 +806,7 @@ tk.Button(save_param, text='保存参数', command=lambda: get_scale_params()).p
 
 tk.Button(save_param, text='处理图像', command=lambda: handle_current_image()).pack(side=tk.RIGHT, padx=10)
 
-tk.Button(save_param2, text='颜色翻转', command=lambda: flip_colors()).pack(side=tk.LEFT, padx=10)
+tk.Button(save_param2, text='颜色翻转', command=lambda: flip_and_adjust_contrast()).pack(side=tk.LEFT, padx=10)
 
 tk.Button(save_param2, text='选择区域', command=lambda: start_area_selection()).pack(side=tk.RIGHT, padx=10)
 '''
@@ -866,7 +891,9 @@ def release_event(event):
             draw_line(x1, y1, x2, y2)
             if messagebox.askyesno("确认", f"两点之间的像素距离是: {distance:.2f}。保存此测量结果吗？"):
                 blank2.delete(0, tk.END)
-                blank2.insert(0, distance)
+                blank2.insert(0, str(distance))
+                blank2['fg'] = blank2.default_fg_color
+                blank2.is_placeholder_active = False
                 clear_line()
                 stop_measuring()
             else:
@@ -875,6 +902,8 @@ def release_event(event):
 
 def release_event3(event):
     global points, drawing, distance
+    cul_scale_length_mm = float(blank1.get())  
+    cul_scale_length_pixels = float(blank2.get()) 
     if drawing:
         points.append((event.x, event.y))
         drawing = False
@@ -883,9 +912,12 @@ def release_event3(event):
             x2, y2 = points[1]
             distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) /factor
             draw_line(x1, y1, x2, y2)
-            if messagebox.askyesno("确认", f"两点之间的像素距离是: {distance:.2f}。保存此测量结果吗？"):
+            lizi_size  = distance * cul_scale_length_mm / cul_scale_length_pixels
+            if messagebox.askyesno("确认", f"所需测得的最大粒径为: {lizi_size:.2f}nm。保存此测量结果吗？"):
                 blank3.delete(0, tk.END)
-                blank3.insert(0, distance)
+                blank3.insert(0, str(lizi_size))
+                blank3['fg'] = blank3.default_fg_color
+                blank3.is_placeholder_active = False
                 clear_line()
                 stop_measuring()
             else:
@@ -894,6 +926,8 @@ def release_event3(event):
 
 def release_event4(event):
     global points, drawing, distance
+    cul_scale_length_mm = float(blank1.get())  
+    cul_scale_length_pixels = float(blank2.get()) 
     if drawing:
         points.append((event.x, event.y))
         drawing = False
@@ -902,9 +936,12 @@ def release_event4(event):
             x2, y2 = points[1]
             distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) /factor
             draw_line(x1, y1, x2, y2)
-            if messagebox.askyesno("确认", f"两点之间的像素距离是: {distance:.2f}。保存此测量结果吗？"):
+            lizi_size  = distance * cul_scale_length_mm / cul_scale_length_pixels
+            if messagebox.askyesno("确认", f"所需测得的最小粒径为: {lizi_size:.2f}nm。保存此测量结果吗？"):
                 blank4.delete(0, tk.END)
-                blank4.insert(0, distance)
+                blank4.insert(0, str(lizi_size))
+                blank4['fg'] = blank4.default_fg_color
+                blank4.is_placeholder_active = False
                 clear_line()
                 stop_measuring()
             else:
