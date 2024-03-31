@@ -2,3 +2,6 @@
 *.png
 *.csv
 *.tif
+
+dist
+build

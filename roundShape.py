@@ -14,7 +14,26 @@ import pandas as pd
 import re
 import scipy.spatial as spt
 import seaborn as sns
+import sys
 # 初始化全局变量
+
+
+# 资源文件目录访问
+def source_path(relative_path):
+    # 是否Bundle Resource
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
+# 修改当前工作目录，使得资源文件可以被正确访问
+cd = source_path('')
+os.chdir(cd)
+
+
+
 img = None
 photo = None
 canvas = None
@@ -24,6 +43,8 @@ selected_region = None
 selected_file = None
 saved_params = None
 round_id = None
+# scale_flag = 0
+# scale_point = None
 output_folder = "output_folder"
 os.makedirs(output_folder, exist_ok=True)
 mid_folder = "mid_folder"
@@ -279,7 +300,7 @@ def size_distribution_chart():
         processed_image_area.insert('', 'end', text= output_filename)
 
 def recode_csv():
-    selected_file_in2_csv = 'E:\works\lab\lab-image-client\mid_folder\example.csv'
+    # selected_file_in2_csv = 'E:\works\lab\lab-image-client\mid_folder\example.csv'
     with open(selected_file_in2_csv,'r', newline='') as file:
         csv_reader = csv.reader(file)
         rows = list(csv_reader)
@@ -408,6 +429,9 @@ delete_windows_img = list()
 # coordinate_groups =[]
 def delete_row_from_img():
 
+    # selected_file_in2_csv = 'E:\works\lab\lab-image-client\mid_folder\example.csv'
+    # selected_file_in2 = 'E:\works\lab\lab-image-client\output_folder\example.png'
+
     click_point = list()
     add_point_start= list()
     add_point_list = list()
@@ -436,6 +460,29 @@ def delete_row_from_img():
         print(f"delete_image_error:{e}")
         # messagebox.showinfo(text=f'显示异常: {e}')
 # 每次删除点后重绘图画
+    # TODO TEST
+    # def img_scale():
+    #     global scale_flag ,scale_point
+    #     big_img = ImageTk.PhotoImage(Image.open(os.path.abspath(img_path)).resize((width*2, height*2)))
+    #     small_img = ImageTk.PhotoImage(Image.open(os.path.abspath(img_path)).resize((width, height)))
+    #     if scale_flag == 0:
+    #         delete_img_lb.delete(DW_show_img)
+    #         delete_windows_img.pop()
+    #         delete_windows_img.append(big_img)
+    #         delete_img_lb.pack()
+    #         # print(click_point)
+    #         delete_img_lb.create_image(click_point[0][0]-width,click_point[0][1]-height,anchor=tk.NW,image=delete_windows_img[-1])
+    #         scale_point = [click_point[0][0],click_point[0][1]]
+    #         scale_flag = 1
+    #     else:
+    #         delete_img_lb.delete(DW_show_img)
+    #         delete_windows_img.pop()
+    #         delete_windows_img.append(small_img)
+    #         delete_img_lb.pack()
+    #         delete_img_lb.create_image(0,0,anchor=tk.NW,image=delete_windows_img[-1])
+    #         scale_flag = 0
+    # def test2(e):
+    #     print(e.x,e.y)
     def delete_windows_img_redraw():
         delete_windows_menu.entryconfig(0,label="处理中,请等待处理完成后再次删除", state='disable')
         base_filename = os.path.splitext(os.path.basename(selected_file_in2))[0]
@@ -600,10 +647,16 @@ def delete_row_from_img():
 
         delete_windows.title("拖动鼠标圈出想要添加的粒径")
         start_round_draw()
-
+    
+    
     delete_img_lb.bind("<ButtonRelease-3>", pop_delete)
+    # delete_img_lb.bind("<ButtonRelease-3>", pop_delete)
     delete_windows_menu.add_command(label="删除",command=delete_csv_point)
     delete_windows_menu.add_command(label="添加",command=add_point)
+
+    # delete_windows_menu.add_command(label="缩放",command=img_scale)
+    # delete_img_lb.bind("<ButtonRelease-1>", test2)
+
     delete_windows.protocol('WM_DELETE_WINDOW', close_edit_win)
 
 
@@ -637,6 +690,7 @@ menu.add_separator()
 menu_file = tk.Menu(menu, tearoff=False)
 menu_file.add_command(label='选择文件', command=select_file)
 menu_file.add_command(label='选择输出文件夹', command=select_output_folder)
+# menu_file.add_command(label="编辑(test)", command=delete_row_from_img)
 
 menu_tool = tk.Menu(menu, tearoff=False)
 menu_tool.add_command(label='处理图像', command=handle_current_image)
